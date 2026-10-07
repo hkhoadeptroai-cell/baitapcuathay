@@ -1,18 +1,7 @@
 import 'package:flutter/material.dart';
 
-void main() => runApp(const MyApp());
-
 const blue = Color(0xFF2196F3);
 const red = Color(0xFFEF3E3E);
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(debugShowCheckedModeBanner: false, home: Home());
-  }
-}
 
 // Thanh dưới cùng để chuyển nhanh giữa các màn hình khi demo
 class Home extends StatefulWidget {
