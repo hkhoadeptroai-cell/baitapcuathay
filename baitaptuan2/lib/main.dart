@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'bai1.dart';
 import 'bai2.dart';
+import 'bai3.dart' as b3;
 import 'thuchanh.dart';
 
 void main() => runApp(const MyApp());
@@ -40,6 +41,14 @@ class Menu extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const Bai2Screen()),
               ),
               child: const Text('Bài 2: Xếp loại học lực'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const b3.Bai3Screen()),
+              ),
+              child: const Text('Bài 3: Bảng điểm lớp'),
             ),
             const SizedBox(height: 12),
             ElevatedButton(
