@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/routes.dart';
+import '../data/auth_service.dart';
 import '../data/task_repository.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -11,6 +12,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final auth = AuthService.instance;
     final all = TaskRepository.instance.all;
     final done = all.where((t) => t.done).length;
     final rate = all.isEmpty ? 0 : (done * 100 / all.length).round();
@@ -41,20 +43,43 @@ class ProfileScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Center(
+          Center(
             child: CircleAvatar(
               radius: 36,
-              child: Text('MA', style: TextStyle(fontSize: 24)),
+              backgroundImage: auth.photoUrl == null
+                  ? null
+                  : NetworkImage(auth.photoUrl!),
+              child: auth.photoUrl == null
+                  ? Text(auth.initials, style: const TextStyle(fontSize: 24))
+                  : null,
             ),
           ),
           const SizedBox(height: 8),
-          const Center(
+          Center(
             child: Text(
-              'Minh Anh',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              auth.name,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
-          const Center(child: Text('minhanh@gmail.com')),
+          Center(child: Text(auth.email)),
+          if (!auth.isGuest)
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F6EA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  '✓ Đã liên kết tài khoản Google',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF1B9E5A)),
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -80,7 +105,7 @@ class ProfileScreen extends StatelessWidget {
                           height: _week[i] * 12.0,
                           margin: const EdgeInsets.symmetric(horizontal: 6),
                           decoration: BoxDecoration(
-                            color: cs.primary.withOpacity(.6),
+                            color: cs.primary.withValues(alpha: .6),
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
@@ -94,11 +119,16 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
-            onPressed: () => Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.login,
-              (_) => false,
-            ),
+            onPressed: () async {
+              await AuthService.instance.signOut();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  AppRoutes.login,
+                  (_) => false,
+                );
+              }
+            },
             icon: const Icon(Icons.logout, color: Colors.red),
             label: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/routes.dart';
+import '../data/auth_service.dart';
 import '../widgets/common.dart';
 
 const _blue = Color(0xFF2F5BEA);
@@ -16,8 +17,11 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted)
-        Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+      if (!mounted) return;
+      final route = AuthService.instance.user != null
+          ? AppRoutes.home
+          : AppRoutes.onboarding;
+      Navigator.pushReplacementNamed(context, route);
     });
   }
 
@@ -210,6 +214,35 @@ class LoginScreen extends StatelessWidget {
   void _enter(BuildContext c) =>
       Navigator.pushNamedAndRemoveUntil(c, AppRoutes.home, (_) => false);
 
+  Future<void> _signIn(BuildContext c, Future<void> Function() action) async {
+    final messenger = ScaffoldMessenger.of(c);
+    try {
+      await action();
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
+          content: Text(
+            'Đăng nhập thành công! Xin chào ${AuthService.instance.name}',
+          ),
+        ),
+      );
+      if (c.mounted) _enter(c);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Đăng nhập thất bại: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _google(BuildContext c) =>
+      _signIn(c, AuthService.instance.signInWithGoogle);
+
+  Future<void> _guest(BuildContext c) =>
+      _signIn(c, AuthService.instance.signInGuest);
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(),
@@ -240,7 +273,7 @@ class LoginScreen extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: OutlinedButton.icon(
-              onPressed: () => _enter(context),
+              onPressed: () => _google(context),
               icon: const Icon(Icons.g_mobiledata, size: 28),
               label: const Text('Tiếp tục với Google'),
             ),
@@ -248,8 +281,16 @@ class LoginScreen extends StatelessWidget {
           const Center(child: Text('hoặc')),
           Center(
             child: TextButton(
-              onPressed: () => _enter(context),
+              onPressed: () => _guest(context),
               child: const Text('Dùng thử không cần tài khoản'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Center(
+            child: Text(
+              'Khi tiếp tục, bạn đồng ý với Điều khoản sử dụng và Chính sách quyền riêng tư của UTH Todo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10, color: Colors.grey),
             ),
           ),
         ],

@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'core/routes.dart';
 import 'data/app_settings.dart';
 
-void main() => runApp(const UthTodoApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: 'AIzaSyDSOOYqeitoOPcgkVMFmAQjHmgKaob_6-U',
+      authDomain: 'uth-todo-43070.firebaseapp.com',
+      projectId: 'uth-todo-43070',
+      storageBucket: 'uth-todo-43070.firebasestorage.app',
+      messagingSenderId: '212819653430',
+      appId: '1:212819653430:web:c52d53bea2ede82886f997',
+      measurementId: 'G-V64D73ZWHE',
+    ),
+  );
+  runApp(const UthTodoApp());
+}
 
 class UthTodoApp extends StatelessWidget {
   const UthTodoApp({super.key});

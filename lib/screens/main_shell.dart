@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/routes.dart';
 import '../core/utils.dart';
 import '../data/app_settings.dart';
+import '../data/auth_service.dart';
 import '../data/task_repository.dart';
 import '../models/task.dart';
 import '../widgets/common.dart';
@@ -83,6 +84,22 @@ class _MainShellState extends State<MainShell> {
   );
 }
 
+// Avatar của người dùng đăng nhập (ảnh Google hoặc chữ cái đầu)
+class UserAvatar extends StatelessWidget {
+  const UserAvatar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = AuthService.instance;
+    return CircleAvatar(
+      backgroundImage: auth.photoUrl == null
+          ? null
+          : NetworkImage(auth.photoUrl!),
+      child: auth.photoUrl == null ? Text(auth.initials) : null,
+    );
+  }
+}
+
 // ---------------- TRANG CHỦ ----------------
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key, required this.onBell, required this.onSeeAll});
@@ -93,7 +110,7 @@ class HomeTab extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return ListenableBuilder(
       listenable: _repo,
-      builder: (_, __) {
+      builder: (_, _) {
         final today = _repo.today;
         final done = today.where((t) => t.done).length;
         final ratio = today.isEmpty ? 0.0 : done / today.length;
@@ -103,7 +120,11 @@ class HomeTab extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const CircleAvatar(child: Text('MA')),
+                  GestureDetector(
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.profile),
+                    child: const UserAvatar(),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -114,7 +135,7 @@ class HomeTab extends StatelessWidget {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         Text(
-                          'Chào UTH!',
+                          'Chào ${AuthService.instance.name}!',
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
@@ -266,7 +287,7 @@ class _ListTabState extends State<ListTab> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _repo,
-    builder: (_, __) {
+    builder: (_, _) {
       bool match(Task t) =>
           (_filter == null || t.group == _filter) &&
           t.title.toLowerCase().contains(_query.toLowerCase());
@@ -336,7 +357,7 @@ class NotificationTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _repo,
-    builder: (_, __) {
+    builder: (_, _) {
       final list = _repo.all.where((t) => t.remind && !t.done).toList()
         ..sort((a, b) => a.due.compareTo(b.due));
       return SafeArea(
@@ -384,7 +405,7 @@ class SettingsTab extends StatelessWidget {
     final s = AppSettings.instance;
     return ListenableBuilder(
       listenable: s,
-      builder: (_, __) => SafeArea(
+      builder: (_, _) => SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -399,7 +420,7 @@ class SettingsTab extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: () => Navigator.pushNamed(context, AppRoutes.profile),
-                  child: const CircleAvatar(child: Text('MA')),
+                  child: const UserAvatar(),
                 ),
               ],
             ),
