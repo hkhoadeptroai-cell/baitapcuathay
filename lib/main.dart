@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'data/remote_settings.dart';
 import 'core/routes.dart';
 import 'data/app_settings.dart';
 
@@ -17,6 +18,7 @@ Future<void> main() async {
       measurementId: 'G-V64D73ZWHE',
     ),
   );
+  await RemoteSettings.instance.init();
   runApp(const UthTodoApp());
 }
 

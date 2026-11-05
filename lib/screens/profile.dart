@@ -120,6 +120,7 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () async {
+              TaskRepository.instance.stop();
               await AuthService.instance.signOut();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(

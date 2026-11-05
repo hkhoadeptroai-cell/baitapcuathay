@@ -29,6 +29,14 @@ class SubTask extends Entity {
   SubTask(this.title, {this.done = false, super.id});
   final String title;
   bool done;
+
+  Map<String, dynamic> toMap() => {'id': id, 'title': title, 'done': done};
+
+  factory SubTask.fromMap(Map<String, dynamic> m) => SubTask(
+    m['title'] as String? ?? '',
+    done: m['done'] as bool? ?? false,
+    id: m['id'] as String?,
+  );
 }
 
 class Task extends Entity {
@@ -54,4 +62,30 @@ class Task extends Entity {
 
   int get subDone => subTasks.where((s) => s.done).length;
   double get progress => subTasks.isEmpty ? 0 : subDone / subTasks.length;
+
+  Map<String, dynamic> toMap() => {
+    'title': title,
+    'note': note,
+    'group': group.name,
+    'priority': priority.name,
+    'due': due.millisecondsSinceEpoch,
+    'remind': remind,
+    'done': done,
+    'subTasks': subTasks.map((s) => s.toMap()).toList(),
+  };
+
+  factory Task.fromMap(String id, Map<String, dynamic> m) => Task(
+    id: id,
+    title: m['title'] as String? ?? '',
+    note: m['note'] as String? ?? '',
+    group: TaskGroup.values.byName(m['group'] as String? ?? 'study'),
+    priority: Priority.values.byName(m['priority'] as String? ?? 'medium'),
+    due: DateTime.fromMillisecondsSinceEpoch(m['due'] as int),
+    remind: m['remind'] as bool? ?? true,
+    done: m['done'] as bool? ?? false,
+    subTasks: [
+      for (final s in (m['subTasks'] as List? ?? []))
+        SubTask.fromMap(Map<String, dynamic>.from(s as Map)),
+    ],
+  );
 }

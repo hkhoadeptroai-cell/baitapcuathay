@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/remote_settings.dart';
 import '../core/routes.dart';
 import '../core/utils.dart';
 import '../data/app_settings.dart';
@@ -27,6 +28,11 @@ class _MainShellState extends State<MainShell> {
     (Icons.tune, 'Cài đặt'),
   ];
   int _index = 0;
+  @override
+  void initState() {
+    super.initState();
+    _repo.start();
+  }
 
   void _go(int i) => setState(() => _index = i);
 
@@ -173,9 +179,9 @@ class HomeTab extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const Text(
-                            'Bắt đầu từ việc khó nhất nhé.',
-                            style: TextStyle(
+                          Text(
+                            RemoteSettings.instance.homeTip,
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
                             ),

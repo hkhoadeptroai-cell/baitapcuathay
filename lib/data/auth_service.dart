@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'analytics_service.dart';
+
 class AuthService {
   AuthService._();
   static final instance = AuthService._();
@@ -28,9 +30,13 @@ class AuthService {
     } else {
       await _auth.signInWithProvider(provider);
     }
+    await Analytics.login('google');
   }
 
-  Future<void> signInGuest() => _auth.signInAnonymously();
+  Future<void> signInGuest() async {
+    await _auth.signInAnonymously();
+    await Analytics.login('anonymous');
+  }
 
   Future<void> signOut() => _auth.signOut();
 }
