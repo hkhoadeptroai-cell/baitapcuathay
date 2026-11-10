@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/realtime_stats.dart';
 import '../data/remote_settings.dart';
 import '../core/routes.dart';
 import '../core/utils.dart';
@@ -32,6 +33,7 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _repo.start();
+    RealtimeStats.recordOpen();
   }
 
   void _go(int i) => setState(() => _index = i);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/routes.dart';
 import '../data/auth_service.dart';
+import '../data/realtime_stats.dart';
 import '../data/task_repository.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -17,23 +18,19 @@ class ProfileScreen extends StatelessWidget {
     final done = all.where((t) => t.done).length;
     final rate = all.isEmpty ? 0 : (done * 100 / all.length).round();
 
-    Widget stat(String v, String label) => Expanded(
-      child: Card(
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Column(
-            children: [
-              Text(
-                v,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(label, style: const TextStyle(fontSize: 11)),
-            ],
-          ),
+    // Ô thống kê (không bọc Expanded, để bọc ở chỗ dùng)
+    Widget stat(String v, String label) => Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Column(
+          children: [
+            Text(
+              v,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            Text(label, style: const TextStyle(fontSize: 11)),
+          ],
         ),
       ),
     );
@@ -83,9 +80,15 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              stat('$done', 'Việc đã xong'),
-              stat('12 ngày', 'Chuỗi liên tiếp'),
-              stat('$rate%', 'Đúng hạn'),
+              Expanded(child: stat('$done', 'Việc đã xong')),
+              Expanded(
+                child: StreamBuilder<int>(
+                  stream: RealtimeStats.opens(),
+                  builder: (_, snap) =>
+                      stat('${snap.data ?? 0}', 'Lượt mở app'),
+                ),
+              ),
+              Expanded(child: stat('$rate%', 'Đúng hạn')),
             ],
           ),
           const SizedBox(height: 16),

@@ -9,13 +9,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: const FirebaseOptions(
+      measurementId: 'G-V64D73ZWHE',
+      databaseURL: 'https://console.firebase.google.com/u/0/project/uth-todo-43070/overview',
       apiKey: 'AIzaSyDSOOYqeitoOPcgkVMFmAQjHmgKaob_6-U',
       authDomain: 'uth-todo-43070.firebaseapp.com',
       projectId: 'uth-todo-43070',
       storageBucket: 'uth-todo-43070.firebasestorage.app',
       messagingSenderId: '212819653430',
       appId: '1:212819653430:web:c52d53bea2ede82886f997',
-      measurementId: 'G-V64D73ZWHE',
     ),
   );
   await RemoteSettings.instance.init();
