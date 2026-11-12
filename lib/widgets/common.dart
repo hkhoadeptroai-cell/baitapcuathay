@@ -112,7 +112,50 @@ class TaskTile extends StatelessWidget {
           ],
         ),
       ),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: task.priority == Priority.high && !task.done
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFE3E3),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Gấp',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFFD92D20),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          : const Icon(Icons.chevron_right),
+    ),
+  );
+}
+
+class ErrorView extends StatelessWidget {
+  const ErrorView({super.key, required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+          const SizedBox(height: 12),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Thử lại'),
+          ),
+        ],
+      ),
     ),
   );
 }

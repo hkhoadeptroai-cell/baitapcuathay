@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'core/utils.dart';
 import 'data/remote_settings.dart';
 import 'core/routes.dart';
 import 'data/app_settings.dart';
@@ -40,6 +41,7 @@ class UthTodoApp extends StatelessWidget {
       );
       return MaterialApp(
         title: 'UTH Todo',
+        scaffoldMessengerKey: messengerKey,
         debugShowCheckedModeBanner: false,
         theme: theme(Brightness.light),
         darkTheme: theme(Brightness.dark),

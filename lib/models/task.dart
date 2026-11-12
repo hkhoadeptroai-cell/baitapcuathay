@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/utils.dart';
+
 enum TaskGroup {
   study('Học tập', Color(0xFF2F5BEA), Color(0xFFE3EAFF), Icons.school_outlined),
   life('Cuộc sống', Color(0xFFE8731A), Color(0xFFFFEBD9), Icons.home_outlined);
@@ -29,14 +31,6 @@ class SubTask extends Entity {
   SubTask(this.title, {this.done = false, super.id});
   final String title;
   bool done;
-
-  Map<String, dynamic> toMap() => {'id': id, 'title': title, 'done': done};
-
-  factory SubTask.fromMap(Map<String, dynamic> m) => SubTask(
-    m['title'] as String? ?? '',
-    done: m['done'] as bool? ?? false,
-    id: m['id'] as String?,
-  );
 }
 
 class Task extends Entity {
@@ -63,29 +57,46 @@ class Task extends Entity {
   int get subDone => subTasks.where((s) => s.done).length;
   double get progress => subTasks.isEmpty ? 0 : subDone / subTasks.length;
 
-  Map<String, dynamic> toMap() => {
+  /// Chuyển JSON của API thành Task. [shiftDays] dùng để dời ngày mẫu về hôm nay.
+  factory Task.fromApi(Map<String, dynamic> m, {int shiftDays = 0}) {
+    final d = DateTime.tryParse('${m['date']}') ?? DateTime.now();
+    final p = '${m['time'] ?? '00:00'}'.split(':');
+    final h = int.tryParse(p.first) ?? 0;
+    final mi = p.length > 1 ? (int.tryParse(p[1]) ?? 0) : 0;
+    return Task(
+      id: '${m['id']}',
+      title: m['title'] as String? ?? '',
+      note: m['note'] as String? ?? '',
+      group: m['category'] == 'life' ? TaskGroup.life : TaskGroup.study,
+      priority: Priority.values.firstWhere(
+        (p) => p.name == m['priority'],
+        orElse: () => Priority.medium,
+      ),
+      due: DateTime(d.year, d.month, d.day + shiftDays, h, mi),
+      remind: m['remind'] as bool? ?? true,
+      done: m['done'] as bool? ?? false,
+      subTasks: [
+        for (final s in (m['subtasks'] as List? ?? []))
+          SubTask(
+            (s as Map)['title'] as String? ?? '',
+            done: s['done'] as bool? ?? false,
+          ),
+      ],
+    );
+  }
+
+  /// Chuyển Task thành JSON để gửi lên API.
+  Map<String, dynamic> toApi() => {
     'title': title,
     'note': note,
-    'group': group.name,
+    'category': group == TaskGroup.life ? 'life' : 'study',
+    'date': '${due.year}-${two(due.month)}-${two(due.day)}',
+    'time': '${two(due.hour)}:${two(due.minute)}',
     'priority': priority.name,
-    'due': due.millisecondsSinceEpoch,
     'remind': remind,
     'done': done,
-    'subTasks': subTasks.map((s) => s.toMap()).toList(),
-  };
-
-  factory Task.fromMap(String id, Map<String, dynamic> m) => Task(
-    id: id,
-    title: m['title'] as String? ?? '',
-    note: m['note'] as String? ?? '',
-    group: TaskGroup.values.byName(m['group'] as String? ?? 'study'),
-    priority: Priority.values.byName(m['priority'] as String? ?? 'medium'),
-    due: DateTime.fromMillisecondsSinceEpoch(m['due'] as int),
-    remind: m['remind'] as bool? ?? true,
-    done: m['done'] as bool? ?? false,
-    subTasks: [
-      for (final s in (m['subTasks'] as List? ?? []))
-        SubTask.fromMap(Map<String, dynamic>.from(s as Map)),
+    'subtasks': [
+      for (final s in subTasks) {'title': s.title, 'done': s.done},
     ],
-  );
+  };
 }

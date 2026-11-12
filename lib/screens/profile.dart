@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/routes.dart';
 import '../data/auth_service.dart';
+import '../data/messaging_service.dart';
 import '../data/realtime_stats.dart';
 import '../data/task_repository.dart';
 
@@ -90,6 +92,38 @@ class ProfileScreen extends StatelessWidget {
               ),
               Expanded(child: stat('$rate%', 'Đúng hạn')),
             ],
+          ),
+          const SizedBox(height: 8),
+          Card(
+            elevation: 0,
+            child: ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Thông báo đẩy'),
+              subtitle: const Text('Bật và sao chép mã thiết bị để gửi thử'),
+              trailing: FilledButton(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final t = await MessagingService.instance.enable();
+                  if (t == null) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        backgroundColor: Colors.red,
+                        content: Text('Chưa được cấp quyền thông báo'),
+                      ),
+                    );
+                    return;
+                  }
+                  await Clipboard.setData(ClipboardData(text: t));
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Colors.green,
+                      content: Text('Đã bật thông báo và sao chép token'),
+                    ),
+                  );
+                },
+                child: const Text('Bật'),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           const Text('Tuần này', style: TextStyle(fontWeight: FontWeight.bold)),

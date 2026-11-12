@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 String two(int n) => n.toString().padLeft(2, '0');
 String fmtTime(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
 String fmtDate(DateTime d) => '${two(d.day)}/${two(d.month)}';
@@ -16,4 +18,14 @@ String fmtLong(DateTime d) {
   const names = ['Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy'];
   final w = d.weekday == 7 ? 'Chủ nhật' : 'Thứ ${names[d.weekday - 1]}';
   return '$w, ${d.day} tháng ${d.month}';
+}
+
+final messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+void toast(String msg, {bool error = false}) {
+  messengerKey.currentState
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(backgroundColor: error ? Colors.red : null, content: Text(msg)),
+    );
 }

@@ -1,20 +1,26 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-import 'analytics_service.dart';
 import '../core/utils.dart';
 import '../models/task.dart';
+import 'analytics_service.dart';
+import 'api_service.dart';
+
+enum LoadState { idle, loading, ready, error }
 
 class TaskRepository extends ChangeNotifier {
   TaskRepository._();
   static final instance = TaskRepository._();
 
+  // Dữ liệu mẫu ghi ngày 20/10/2026 -> dời ngày sớm nhất thành hôm nay cho giống slide.
+  static const _alignSampleToToday = true;
+
+  final _api = ApiService.instance;
+  final _dirty = <String>{}; // việc đã sửa trong máy (mock không lưu thật)
   List<Task> _tasks = [];
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
-  CollectionReference<Map<String, dynamic>>? _col;
+  int _shiftDays = 0;
+
+  LoadState state = LoadState.idle;
+  String? error;
 
   List<Task> get all => List.unmodifiable(_tasks);
 
@@ -32,131 +38,175 @@ class TaskRepository extends ChangeNotifier {
   int pendingOf(TaskGroup g) =>
       _tasks.where((t) => t.group == g && !t.done).length;
 
-  /// Gọi sau khi đăng nhập: lắng nghe việc của user hiện tại trên Firestore.
-  void start() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    _sub?.cancel();
-    _col = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('tasks');
-    var first = true;
-    _sub = _col!.snapshots().listen((snap) {
-      if (first && snap.docs.isEmpty && !snap.metadata.isFromCache) {
-        _seed();
-      }
-      first = false;
-      _tasks = snap.docs.map((d) => Task.fromMap(d.id, d.data())).toList();
-      notifyListeners();
-    }, onError: (e) => debugPrint('Firestore lỗi: $e'));
-  }
+  // ---------------- TẢI DỮ LIỆU ----------------
+  void start() => Future.microtask(load);
 
-  /// Gọi khi đăng xuất.
   void stop() {
-    _sub?.cancel();
-    _sub = null;
-    _col = null;
     _tasks = [];
+    _dirty.clear();
+    _shiftDays = 0;
+    state = LoadState.idle;
+    error = null;
     notifyListeners();
   }
 
-  void _write(Task t) => _col?.doc(t.id).set(t.toMap());
-
-  void save(Task t) {
-    final i = _tasks.indexWhere((e) => e.id == t.id);
-    if (i < 0) {
-      _tasks.insert(0, t);
-      Analytics.addTask(t.group.name);
-    } else {
-      _tasks[i] = t;
+  int _computeShift(List<dynamic> raw) {
+    DateTime? min;
+    for (final m in raw) {
+      final d = DateTime.tryParse('${(m as Map)['date']}');
+      if (d != null && (min == null || d.isBefore(min))) min = d;
     }
-    _write(t);
+    if (min == null) return 0;
+    final now = DateTime.now();
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime(min.year, min.month, min.day)).inDays;
+  }
+
+  /// GET /tasks (Trang chủ, Danh sách)
+  Future<void> load() async {
+    state = LoadState.loading;
+    error = null;
+    notifyListeners();
+    try {
+      final raw = await _api.getTasks();
+      _shiftDays = _alignSampleToToday ? _computeShift(raw) : 0;
+      _tasks = [
+        for (final m in raw)
+          Task.fromApi(
+            Map<String, dynamic>.from(m as Map),
+            shiftDays: _shiftDays,
+          ),
+      ];
+      _dirty.clear();
+      state = LoadState.ready;
+    } on ApiException catch (e) {
+      error = e.message;
+      state = LoadState.error;
+    } catch (_) {
+      error = 'Dữ liệu trả về không đúng định dạng';
+      state = LoadState.error;
+    }
     notifyListeners();
   }
 
-  void remove(String id) {
-    _tasks.removeWhere((t) => t.id == id);
-    _col?.doc(id).delete();
-    notifyListeners();
+  /// GET /tasks/{id} (mở Chi tiết). Trả về null nếu thành công, ngược lại là thông báo lỗi.
+  Future<String?> loadDetail(String id) async {
+    try {
+      final m = await _api.getTask(id);
+      final t = Task.fromApi(
+        Map<String, dynamic>.from(m as Map),
+        shiftDays: _shiftDays,
+      );
+      // Mock trả cùng một mẫu cho mọi id và không lưu thay đổi -> chỉ nhận khi đúng id và chưa sửa.
+      if (t.id == id && !_dirty.contains(id)) {
+        final i = _tasks.indexWhere((e) => e.id == id);
+        if (i >= 0) _tasks[i] = t;
+      }
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Dữ liệu trả về không đúng định dạng';
+    }
   }
+
+  // ---------------- SỬA / XÓA (PATCH, DELETE) ----------------
+  Future<void> _patch(
+    Task t,
+    Map<String, dynamic> body,
+    VoidCallback revert,
+  ) async {
+    try {
+      await _api.patchTask(t.id, body);
+      _dirty.add(t.id);
+    } on ApiException catch (e) {
+      revert();
+      notifyListeners();
+      toast('Cập nhật thất bại: ${e.message}', error: true);
+    }
+  }
+
+  List<Map<String, dynamic>> _subs(Task t) => [
+    for (final s in t.subTasks) {'title': s.title, 'done': s.done},
+  ];
 
   void toggle(Task t) {
-    t.done = !t.done;
-    if (t.done) Analytics.completeTask();
-    _write(t);
+    final v = !t.done;
+    t.done = v;
+    if (v) Analytics.completeTask();
     notifyListeners();
+    _patch(t, {'done': v}, () => t.done = !v);
   }
 
-  void toggleSub(SubTask s) {
+  void toggleSub(Task t, SubTask s) {
     s.done = !s.done;
-    for (final t in _tasks) {
-      if (t.subTasks.contains(s)) _write(t);
-    }
     notifyListeners();
+    _patch(t, {'subtasks': _subs(t)}, () => s.done = !s.done);
   }
 
   void addSub(Task t, String title) {
-    t.subTasks.add(SubTask(title));
-    _write(t);
+    final s = SubTask(title);
+    t.subTasks.add(s);
     notifyListeners();
+    _patch(t, {'subtasks': _subs(t)}, () => t.subTasks.remove(s));
+  }
+
+  void editSub(Task t, SubTask s, String title) {
+    final i = t.subTasks.indexOf(s);
+    if (i < 0) return;
+    t.subTasks[i] = SubTask(title, done: s.done, id: s.id);
+    notifyListeners();
+    _patch(t, {'subtasks': _subs(t)}, () => t.subTasks[i] = s);
   }
 
   void removeSub(Task t, SubTask s) {
-    t.subTasks.remove(s);
-    _write(t);
+    final i = t.subTasks.indexOf(s);
+    if (i < 0) return;
+    t.subTasks.removeAt(i);
     notifyListeners();
+    _patch(t, {'subtasks': _subs(t)}, () => t.subTasks.insert(i, s));
   }
 
-  /// Tạo vài việc mẫu cho tài khoản mới (chỉ chạy khi chưa có việc nào).
-  void _seed() {
-    final n = DateTime.now();
-    DateTime at(int h, int m, [int d = 0]) =>
-        DateTime(n.year, n.month, n.day + d, h, m);
-    final list = [
-      Task(
-        id: 'seed1',
-        title: 'Nộp bài tập Lập trình di động',
-        group: TaskGroup.study,
-        due: at(9, 0),
-        priority: Priority.high,
-        note: 'Nộp file .zip lên hệ thống của trường.',
-        subTasks: [
-          SubTask('Hoàn thiện màn hình đăng nhập', done: true, id: 'a1'),
-          SubTask('Chụp ảnh màn hình app', done: true, id: 'a2'),
-          SubTask('Nén file và nộp bài', id: 'a3'),
-        ],
-      ),
-      Task(
-        id: 'seed2',
-        title: 'Ôn chương 3 – Cấu trúc dữ liệu',
-        group: TaskGroup.study,
-        due: at(14, 0),
-      ),
-      Task(
-        id: 'seed3',
-        title: 'Đi chợ mua đồ cho tuần',
-        group: TaskGroup.life,
-        due: at(17, 30),
-      ),
-      Task(
-        id: 'seed4',
-        title: 'Tập thể dục 30 phút',
-        group: TaskGroup.life,
-        due: at(6, 30),
-        done: true,
-      ),
-      Task(
-        id: 'seed5',
-        title: 'Họp nhóm đồ án',
-        group: TaskGroup.study,
-        due: at(20, 0, 1),
-      ),
-    ];
-    final batch = FirebaseFirestore.instance.batch();
-    for (final t in list) {
-      batch.set(_col!.doc(t.id), t.toMap());
+  /// Thêm mới (POST) hoặc sửa (PATCH). Trả về null nếu thành công, ngược lại là thông báo lỗi.
+  Future<String?> save(Task t) async {
+    final i = _tasks.indexWhere((e) => e.id == t.id);
+    try {
+      if (i < 0) {
+        await _api.createTask(t.toApi());
+        _tasks.insert(
+          0,
+          t,
+        ); // mock không lưu thật nên tự thêm vào danh sách trong máy
+        Analytics.addTask(t.group.name);
+      } else {
+        final body = t.toApi();
+        final d = DateTime(t.due.year, t.due.month, t.due.day - _shiftDays);
+        body['date'] = '${d.year}-${two(d.month)}-${two(d.day)}'; // trả về ngày gốc của API
+        await _api.patchTask(t.id, body);
+        _tasks[i] = t;
+        _dirty.add(t.id);
+      }
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
     }
-    batch.commit();
+  }
+
+  /// DELETE /tasks/{id}. Trả về true nếu xóa thành công.
+  Future<bool> remove(String id) async {
+    try {
+      await _api.deleteTask(id);
+      _tasks.removeWhere((t) => t.id == id);
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      toast('Xóa thất bại: ${e.message}', error: true);
+      return false;
+    }
   }
 }

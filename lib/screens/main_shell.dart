@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../data/realtime_stats.dart';
-import '../data/remote_settings.dart';
 import '../core/routes.dart';
 import '../core/utils.dart';
 import '../data/app_settings.dart';
 import '../data/auth_service.dart';
+import '../data/messaging_service.dart';
+import '../data/realtime_stats.dart';
+import '../data/remote_settings.dart';
 import '../data/task_repository.dart';
 import '../models/task.dart';
 import '../widgets/common.dart';
@@ -29,11 +30,28 @@ class _MainShellState extends State<MainShell> {
     (Icons.tune, 'Cài đặt'),
   ];
   int _index = 0;
+
   @override
   void initState() {
     super.initState();
     _repo.start();
     RealtimeStats.recordOpen();
+    MessagingService.instance.listen();
+    MessagingService.instance.lastMessage.addListener(_onPush);
+  }
+
+  void _onPush() {
+    final n = MessagingService.instance.lastMessage.value?.notification;
+    if (n == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('🔔 ${n.title ?? ''}: ${n.body ?? ''}')),
+    );
+  }
+
+  @override
+  void dispose() {
+    MessagingService.instance.lastMessage.removeListener(_onPush);
+    super.dispose();
   }
 
   void _go(int i) => setState(() => _index = i);
@@ -60,14 +78,31 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: IndexedStack(
-      index: _index,
-      children: [
-        HomeTab(onBell: () => _go(2), onSeeAll: () => _go(1)),
-        const ListTab(),
-        const NotificationTab(),
-        const SettingsTab(),
-      ],
+    body: ListenableBuilder(
+      listenable: _repo,
+      builder: (_, _) {
+        final needData = _index <= 1; // Trang chủ, Danh sách
+        if (needData && _repo.all.isEmpty) {
+          if (_repo.state == LoadState.error) {
+            return ErrorView(
+              message: _repo.error ?? 'Có lỗi xảy ra',
+              onRetry: _repo.load,
+            );
+          }
+          if (_repo.state != LoadState.ready) {
+            return const Center(child: CircularProgressIndicator());
+          }
+        }
+        return IndexedStack(
+          index: _index,
+          children: [
+            HomeTab(onBell: () => _go(2), onSeeAll: () => _go(1)),
+            const ListTab(),
+            const NotificationTab(),
+            const SettingsTab(),
+          ],
+        );
+      },
     ),
     floatingActionButton: FloatingActionButton(
       shape: const CircleBorder(),
@@ -302,15 +337,26 @@ class _ListTabState extends State<ListTab> {
       final todo = _repo.all.where((t) => !t.done && match(t)).toList()
         ..sort((a, b) => a.due.compareTo(b.due));
       final finished = _repo.all.where((t) => t.done && match(t)).toList();
+      final pending = _repo.all.where((t) => !t.done).length;
 
       return SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              'Danh sách',
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Danh sách',
+                    style: Theme.of(context).textTheme.headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  '$pending việc chưa xong',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             TextField(
